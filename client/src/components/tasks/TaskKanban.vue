@@ -17,7 +17,7 @@
           </el-tag>
           <span v-if="task.dueDate" class="card-date">{{ formatDate(task.dueDate) }}</span>
         </div>
-        <div v-if="task.notes" class="card-notes">{{ truncateNotes(task.notes) }}</div>
+        <div v-if="task.notes" class="card-notes" v-html="previewNotes(task.notes)"></div>
         <div v-if="childMap[task.id]?.length" class="card-children">
           <div class="children-toggle" @click.stop="toggleExpand(task.id)">
             <el-icon style="margin-right:2px"><component :is="expanded.has(task.id)?CaretBottom:CaretRight" /></el-icon>
@@ -56,10 +56,10 @@
         </el-form-item>
         <el-form-item label="备注">
           <div class="md-toolbar">
-            <el-button size="small" @click="applyBold" title="加粗"><b>B</b></el-button>
-            <el-color-picker size="small" @change="applyColor" :show-alpha="false" :predefine="predefineColors" />
+            <span v-for="c in colorOptions" :key="c.color" class="color-btn" :style="{ background: c.color }" @click="applyColor(c.color)" :title="c.label"></span>
+            <el-button size="small" text @click="clearColor" type="danger">清除颜色</el-button>
           </div>
-          <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown" />
+          <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown，点击上方颜色按钮给备注着色" />
         </el-form-item>
         <el-form-item label="重复">
           <el-switch v-model="editingIsRecurring" active-text="开启" />
@@ -98,7 +98,16 @@ const editingTaskRecurrence = ref({ interval: 1, frequency: 'daily' })
 const editingIsRecurring = ref(false)
 const notesRef = ref(null)
 
-const predefineColors = ['#f56c6c', '#e6a23c', '#67c23a', '#409eff', '#909399']
+const colorOptions = [
+  { color: '#f56c6c', label: '红' },
+  { color: '#e6a23c', label: '橙' },
+  { color: '#67c23a', label: '绿' },
+  { color: '#409eff', label: '蓝' },
+  { color: '#909399', label: '灰' },
+  { color: '#e040fb', label: '紫' },
+  { color: '#ff6f00', label: '深橙' },
+  { color: '#00bfa5', label: '青' },
+]
 
 const columns = [
   { key: 'todo', label: '待办' },
@@ -134,40 +143,23 @@ async function saveEdit() {
 
 async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessage.success('已移至回收站') }
 
-function truncateNotes(notes) {
+function previewNotes(notes) {
   if (!notes) return ''
-  const plain = notes.replace(/<[^>]+>/g, '').replace(/[*_~`#]/g, '').trim()
-  return plain.length > 30 ? plain.substring(0, 30) + '...' : plain
+  const withColor = notes.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  return '<span style="font-size:12px;color:var(--el-text-color-placeholder);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">' + withColor + '</span>'
 }
 
-// ── Markdown toolbar ──
-function getTextarea() { return notesRef.value?.$el?.querySelector('textarea') || notesRef.value?.textarea }
-
-function applyBold() {
-  const el = getTextarea(); if (!el) return
-  const text = editingTask.value.notes || ''
-  const start = el.selectionStart; const end = el.selectionEnd
-  if (start !== end) {
-    const selected = text.substring(start, end)
-    editingTask.value.notes = text.substring(0, start) + '**' + selected + '**' + text.substring(end)
-    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 2 + selected.length) })
-  } else {
-    editingTask.value.notes = text.substring(0, start) + '**粗体**' + text.substring(start)
-    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 4) })
-  }
-}
-
+// ── Color toolbar ──
 function applyColor(color) {
-  const el = getTextarea(); if (!el) return
   const text = editingTask.value.notes || ''
-  const start = el.selectionStart; const end = el.selectionEnd
-  if (start !== end) {
-    const selected = text.substring(start, end)
-    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
-  } else {
-    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">文字</span>' + text.substring(start)
-  }
-  nextTick(() => { el.focus() })
+  if (!text.trim()) return
+  const clean = text.replace(/<span style="color:[^"]+">/g, '').replace(/<\/span>/g, '')
+  editingTask.value.notes = '<span style="color:' + color + '">' + clean.trim() + '</span>'
+}
+
+function clearColor() {
+  const text = editingTask.value.notes || ''
+  editingTask.value.notes = text.replace(/<span style="color:[^"]+">/g, '').replace(/<\/span>/g, '')
 }
 
 let draggedTask = null
@@ -192,7 +184,8 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .kanban-card:hover .card-delete { opacity:1; }
 .card-meta { display:flex; align-items:center; gap:6px; margin-top:6px; }
 .card-date { font-size:12px; color:var(--el-text-color-secondary); }
-.card-notes { font-size:12px; color:var(--el-text-color-placeholder); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card-notes { margin-top:4px; }
+.card-notes :deep(span) { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
 .card-children { margin-top:8px; border-top:1px solid var(--el-border-color-lighter); padding-top:6px; }
 .children-toggle { font-size:12px; color:var(--el-color-primary); cursor:pointer; display:flex; align-items:center; }
 .children-toggle:hover { text-decoration:underline; }
@@ -202,7 +195,8 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .child-title.done { text-decoration:line-through; color:var(--el-text-color-placeholder); }
 
 .md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-.md-toolbar .el-button { min-width:28px; height:28px; padding:0 6px; font-size:12px; }
+.color-btn { width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all 0.15s; display:inline-block; }
+.color-btn:hover { border-color:var(--el-text-color-primary); transform:scale(1.15); }
 
 @media (max-width:768px) {
   .kanban { flex-direction:column; gap:12px; height:auto; overflow-y:auto; }

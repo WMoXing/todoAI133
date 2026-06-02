@@ -6,7 +6,7 @@
         <el-checkbox :model-value="task.completed" @change="(val) => toggleComplete(task, val)" />
         <div class="task-info" @click="editTask(task)">
           <div class="task-title" :class="{ completed: task.completed }"><span v-if="task.isRecurring" class="recur-icon">&#x1F501;</span>{{ task.title }}</div>
-          <div class="task-notes-preview" v-if="task.notes">{{ truncateNotes(task.notes) }}</div>
+          <div class="task-notes-preview" v-if="task.notes" v-html="previewNotes(task.notes)"></div>
           <div class="task-meta">
             <el-tag v-if="task.priority==='high'" type="danger" size="small">高</el-tag>
             <el-tag v-else-if="task.priority==='medium'" type="warning" size="small">中</el-tag>
@@ -36,7 +36,7 @@
             <el-checkbox :model-value="getChild(childId).completed" @change="(val) => toggleComplete(getChild(childId), val)" size="small" />
             <div class="task-info" @click="editTask(getChild(childId))">
               <div class="task-title" :class="{ completed: getChild(childId).completed }"><span v-if="getChild(childId).isRecurring" class="recur-icon">&#x1F501;</span>{{ getChild(childId).title }}</div>
-              <div class="task-notes-preview" v-if="getChild(childId).notes">{{ truncateNotes(getChild(childId).notes) }}</div>
+              <div class="task-notes-preview" v-if="getChild(childId).notes" v-html="previewNotes(getChild(childId).notes)"></div>
               <div class="task-meta">
                 <el-tag v-if="getChild(childId).priority==='high'" type="danger" size="small">高</el-tag>
                 <el-tag v-else-if="getChild(childId).priority==='medium'" type="warning" size="small">中</el-tag>
@@ -76,10 +76,10 @@
         </el-form-item>
         <el-form-item label="备注">
           <div class="md-toolbar">
-            <el-button size="small" @click="applyBold" title="加粗"><b>B</b></el-button>
-            <el-color-picker size="small" @change="applyColor" :show-alpha="false" :predefine="predefineColors" />
+            <span v-for="c in colorOptions" :key="c.color" class="color-btn" :style="{ background: c.color }" @click="applyColor(c.color)" :title="c.label"></span>
+            <el-button size="small" text @click="clearColor" type="danger">清除颜色</el-button>
           </div>
-          <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown" />
+          <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown，点击上方颜色按钮给备注着色" />
         </el-form-item>
         <el-form-item label="重复">
           <el-switch v-model="editingIsRecurring" active-text="开启" />
@@ -149,7 +149,16 @@ const breakdownLoading = ref(false)
 const breakdownTask = ref(null)
 const breakdownSteps = ref([])
 
-const predefineColors = ['#f56c6c', '#e6a23c', '#67c23a', '#409eff', '#909399']
+const colorOptions = [
+  { color: '#f56c6c', label: '红' },
+  { color: '#e6a23c', label: '橙' },
+  { color: '#67c23a', label: '绿' },
+  { color: '#409eff', label: '蓝' },
+  { color: '#909399', label: '灰' },
+  { color: '#e040fb', label: '紫' },
+  { color: '#ff6f00', label: '深橙' },
+  { color: '#00bfa5', label: '青' },
+]
 
 const rootTasks = computed(() => taskStore.activeTasks.filter(t => !t.parentId))
 function getChild(id) { return taskStore.tasks.find(t => t.id === id) }
@@ -177,42 +186,25 @@ async function saveEdit() {
 
 async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessage.success('已移至回收站') }
 
-function truncateNotes(notes) {
+function previewNotes(notes) {
   if (!notes) return ''
-  const plain = notes.replace(/<[^>]+>/g, '').replace(/[*_~`#]/g, '').trim()
-  return plain.length > 40 ? plain.substring(0, 40) + '...' : plain
+  const withColor = notes.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  const plain = withColor.replace(/<[^>]+>/g, '').length
+  const truncated = plain > 40 ? withColor.substring(0, withColor.length - (plain - 40)) + '...' : withColor
+  return '<span style="font-size:12px;color:var(--el-text-color-placeholder);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:320px">' + truncated + '</span>'
 }
 
-// ── Markdown toolbar ──
-function getTextarea() { return notesRef.value?.$el?.querySelector('textarea') || notesRef.value?.textarea }
-
-function applyBold() {
-  const el = getTextarea(); if (!el) return
-  const text = editingTask.value.notes || ''
-  const start = el.selectionStart; const end = el.selectionEnd
-  const hasSelection = start !== end
-  if (hasSelection) {
-    const selected = text.substring(start, end)
-    editingTask.value.notes = text.substring(0, start) + '**' + selected + '**' + text.substring(end)
-    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 2 + selected.length) })
-  } else {
-    editingTask.value.notes = text.substring(0, start) + '**粗体**' + text.substring(start)
-    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 4) })
-  }
-}
-
+// ── Color toolbar ──
 function applyColor(color) {
-  const el = getTextarea(); if (!el) return
   const text = editingTask.value.notes || ''
-  const start = el.selectionStart; const end = el.selectionEnd
-  const hasSelection = start !== end
-  if (hasSelection) {
-    const selected = text.substring(start, end)
-    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
-  } else {
-    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">文字</span>' + text.substring(start)
-  }
-  nextTick(() => { el.focus() })
+  if (!text.trim()) return
+  const clean = text.replace(/<span style="color:[^"]+">/g, '').replace(/<\/span>/g, '')
+  editingTask.value.notes = '<span style="color:' + color + '">' + clean.trim() + '</span>'
+}
+
+function clearColor() {
+  const text = editingTask.value.notes || ''
+  editingTask.value.notes = text.replace(/<span style="color:[^"]+">/g, '').replace(/<\/span>/g, '')
 }
 
 async function startBreakdown(task) {
@@ -244,7 +236,9 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .task-title { font-size:15px; margin-bottom:2px; }
 .task-item.child .task-title { font-size:14px; color:var(--el-text-color-regular); }
 .task-title.completed { text-decoration:line-through; color:var(--el-text-color-placeholder); }
-.task-notes-preview { font-size:12px; color:var(--el-text-color-placeholder); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px; }
+.task-notes-preview { margin-bottom:2px; }
+.task-notes-preview :deep(span) { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; max-width:320px; }
+.task-notes-preview :deep(b) { font-weight:600; }
 .task-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .due-date { font-size:12px; color:var(--el-text-color-secondary); }
 .child-badge { font-size:12px; color:var(--el-color-primary); cursor:pointer; display:inline-flex; align-items:center; }
@@ -258,5 +252,6 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .step-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
 
 .md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-.md-toolbar .el-button { min-width:28px; height:28px; padding:0 6px; font-size:12px; }
+.color-btn { width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:border-color 0.15s; display:inline-block; }
+.color-btn:hover { border-color:var(--el-text-color-primary); transform:scale(1.15); }
 </style>
