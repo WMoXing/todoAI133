@@ -75,11 +75,13 @@
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
-          <div class="md-toolbar">
-            <span v-for="c in colorOptions" :key="c.color" class="color-btn" :style="{ background: c.color }" @click="applyColor(c.color)" :title="c.label"></span>
-            <el-button size="small" text @click="clearColor" type="danger">清除颜色</el-button>
+          <div class="notes-wrap">
+            <div class="md-toolbar">
+              <span v-for="c in colorOptions" :key="c.color" class="color-btn" :style="{ background: c.color }" @click="applyColor(c.color)" :title="c.label"></span>
+              <el-button size="small" text @click="clearColor" type="danger">清除颜色</el-button>
+            </div>
+            <div ref="notesRef" class="notes-editor" contenteditable="true" @input="onNotesInput" placeholder="写点备注..."></div>
           </div>
-          <div ref="notesRef" class="notes-editor" contenteditable="true" @input="onNotesInput" placeholder="写点备注..."></div>
         </el-form-item>
         <el-form-item label="重复">
           <el-switch v-model="editingIsRecurring" active-text="开启" />
@@ -261,18 +263,19 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .child-line::after { content:''; position:absolute; bottom:50%; left:0; width:12px; height:1.5px; background:var(--el-border-color); }
 .step-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
 
-.md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-shrink:0; }
 .color-btn { width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all 0.15s; display:inline-block; }
 .color-btn:hover { border-color:var(--el-text-color-primary); transform:scale(1.15); }
 
 .notes-editor {
-  height:100px; overflow-y:auto; resize:vertical;
+  flex:1; min-height:80px; max-height:180px; overflow-y:auto;
   border:1px solid var(--el-border-color); border-radius:4px;
   padding:8px 12px; font-size:14px; line-height:1.6; outline:none;
   background:var(--el-input-bg-color, var(--el-bg-color));
   color:var(--el-text-color-primary);
 }
 .notes-editor:focus { border-color:var(--el-color-primary); }
+.notes-wrap { display:flex; flex-direction:column; gap:0; }
 .notes-editor:empty::before {
   content:attr(placeholder); color:var(--el-text-color-placeholder);
 }
