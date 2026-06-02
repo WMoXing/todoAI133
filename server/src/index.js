@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors')
+const fs = require('fs')
 const path = require('path')
 const config = require('./config')
 const { loadFromBitiful } = require('./data/store')
@@ -24,15 +25,26 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
-// Serve built frontend in production
+// Serve built frontend
 const distPath = path.join(__dirname, '..', '..', 'client', 'dist')
-app.use(express.static(distPath))
+const indexPath = path.join(distPath, 'index.html')
+const distExists = fs.existsSync(indexPath)
 
-// SPA fallback — all non-API routes serve index.html
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api')) return res.status(404).json({ error: 'not found' })
-  res.sendFile(path.join(distPath, 'index.html'))
-})
+console.log('dist path:', distPath)
+console.log('dist exists:', distExists)
+
+if (distExists) {
+  app.use(express.static(distPath))
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) return res.status(404).json({ error: 'not found' })
+    res.sendFile(indexPath)
+  })
+} else {
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) return res.status(404).json({ error: 'not found' })
+    res.type('html').send('<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>AI Todo</title></head><body style="font-family:sans-serif;padding:40px;text-align:center"><h1>AI Todo</h1><p>前端尚未构建。请在 Render 构建命令中确保运行 <code>npm run build</code>。</p><hr><p>API 状态: <a href="/api/health">/api/health</a></p></body></html>')
+  })
+}
 
 app.use((err, req, res, next) => {
   console.error('Error:', err.message)
