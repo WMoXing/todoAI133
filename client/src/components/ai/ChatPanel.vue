@@ -109,14 +109,13 @@ function enrichRecurring(taskData, userMsg) {
   return taskData
 }
 
-function parseAndCreateTasks(text, userMsg) {
+async function parseAndCreateTasks(text, userMsg) {
   const regex = /\[TASK:(.*?)\]/g
   let match
-  let created = 0
   while ((match = regex.exec(text)) !== null) {
     try {
       const taskData = enrichRecurring(JSON.parse(match[1]), userMsg)
-      taskStore.addTask({
+      await taskStore.addTask({
         title: taskData.title || '新任务',
         priority: taskData.priority || 'medium',
         dueDate: taskData.dueDate || undefined,
@@ -125,7 +124,6 @@ function parseAndCreateTasks(text, userMsg) {
         recurrenceRule: taskData.recurrenceRule || null,
         aiGenerated: true,
       })
-      created++
       ElMessage.success('AI 已添加: ' + (taskData.title || '新任务'))
     } catch (e) {
       // skip invalid JSON
@@ -174,7 +172,7 @@ async function sendMessage() {
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim()
           if (data === '[DONE]') {
-            const cleaned = parseAndCreateTasks(streamingContent.value, lastUserMessage.value)
+            const cleaned = await parseAndCreateTasks(streamingContent.value, lastUserMessage.value)
             currentSession.value.messages.push({ role: 'assistant', content: cleaned })
             streaming.value = false
             streamingContent.value = ''
