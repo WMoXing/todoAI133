@@ -110,9 +110,11 @@ function enrichRecurring(taskData, userMsg) {
 }
 
 async function parseAndCreateTasks(text, userMsg) {
+  console.log('[parseAndCreateTasks] raw text:', text)
   const regex = /\[TASK:(.*?)\]/g
   let match
   while ((match = regex.exec(text)) !== null) {
+    console.log('[parseAndCreateTasks] match found:', match[1])
     try {
       const taskData = enrichRecurring(JSON.parse(match[1]), userMsg)
       await taskStore.addTask({
@@ -126,10 +128,12 @@ async function parseAndCreateTasks(text, userMsg) {
       })
       ElMessage.success('AI 已添加: ' + (taskData.title || '新任务'))
     } catch (e) {
-      // skip invalid JSON
+      console.error('[parseAndCreateTasks] failed:', e.message, 'json:', match[1])
     }
   }
-  return text.replace(/\[TASK:.*?\]/g, '').trim()
+  const cleaned = text.replace(/\[TASK:.*?\]/g, '').trim()
+  if (!cleaned.includes('[TASK:')) console.log('[parseAndCreateTasks] no [TASK:] blocks found in response')
+  return cleaned
 }
 
 function quickSend(text) {
