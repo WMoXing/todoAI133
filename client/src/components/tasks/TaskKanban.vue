@@ -59,7 +59,7 @@
             <span v-for="c in colorOptions" :key="c.color" class="color-btn" :style="{ background: c.color }" @click="applyColor(c.color)" :title="c.label"></span>
             <el-button size="small" text @click="clearColor" type="danger">清除颜色</el-button>
           </div>
-          <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown，点击上方颜色按钮给备注着色" />
+          <div ref="notesRef" class="notes-editor" contenteditable="true" @input="onNotesInput" placeholder="写点备注..."></div>
         </el-form-item>
         <el-form-item label="重复">
           <el-switch v-model="editingIsRecurring" active-text="开启" />
@@ -131,9 +131,13 @@ function editTask(task) {
   editingIsRecurring.value = task.isRecurring || false
   editingTaskRecurrence.value = task.recurrenceRule || { interval: 1, frequency: 'daily' }
   dialogVisible.value = true
+  nextTick(() => {
+    if (notesRef.value) notesRef.value.innerHTML = task.notes || ''
+  })
 }
 
 async function saveEdit() {
+  if (notesRef.value) editingTask.value.notes = notesRef.value.innerHTML
   editingTask.value.isRecurring = editingIsRecurring.value
   editingTask.value.recurrenceRule = editingIsRecurring.value ? editingTaskRecurrence.value : null
   await taskStore.editTask(editingTask.value.id, editingTask.value)
@@ -145,21 +149,28 @@ async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessa
 
 function previewNotes(notes) {
   if (!notes) return ''
-  const withColor = notes.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-  return '<span style="font-size:12px;color:var(--el-text-color-placeholder);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">' + withColor + '</span>'
+  return '<span style="font-size:12px;color:var(--el-text-color-placeholder);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">' + notes + '</span>'
 }
 
-// ── Color toolbar ──
+function onNotesInput() {
+  if (notesRef.value) editingTask.value.notes = notesRef.value.innerHTML
+}
+
 function applyColor(color) {
-  const text = editingTask.value.notes || ''
-  if (!text.trim()) return
-  const clean = text.replace(/<span style="color:[^"]+">/g, '').replace(/<\/span>/g, '')
-  editingTask.value.notes = '<span style="color:' + color + '">' + clean.trim() + '</span>'
+  if (!notesRef.value) return
+  notesRef.value.focus()
+  document.execCommand('selectAll')
+  document.execCommand('foreColor', false, color)
+  notesRef.value.focus()
 }
 
 function clearColor() {
-  const text = editingTask.value.notes || ''
-  editingTask.value.notes = text.replace(/<span style="color:[^"]+">/g, '').replace(/<\/span>/g, '')
+  if (!notesRef.value) return
+  notesRef.value.focus()
+  document.execCommand('selectAll')
+  document.execCommand('removeFormat')
+  document.execCommand('foreColor', false, '')
+  notesRef.value.focus()
 }
 
 let draggedTask = null
@@ -197,6 +208,18 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
 .color-btn { width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all 0.15s; display:inline-block; }
 .color-btn:hover { border-color:var(--el-text-color-primary); transform:scale(1.15); }
+
+.notes-editor {
+  min-height:80px; max-height:200px; overflow-y:auto;
+  border:1px solid var(--el-border-color); border-radius:4px;
+  padding:8px 12px; font-size:14px; line-height:1.6; outline:none;
+  background:var(--el-input-bg-color, var(--el-bg-color));
+  color:var(--el-text-color-primary);
+}
+.notes-editor:focus { border-color:var(--el-color-primary); }
+.notes-editor:empty::before {
+  content:attr(placeholder); color:var(--el-text-color-placeholder);
+}
 
 @media (max-width:768px) {
   .kanban { flex-direction:column; gap:12px; height:auto; overflow-y:auto; }

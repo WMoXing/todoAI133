@@ -48,14 +48,7 @@
                 </el-option>
               </el-select>
             </div>
-            <el-divider direction="vertical" />
-            <div class="filter-group">
-              <el-select v-model="filters.tag" placeholder="标签" size="small" clearable @change="applyFilters" class="filter-select">
-                <el-option v-for="t in allTags" :key="t" :value="t">
-                  <el-tag size="small">{{ t }}</el-tag>
-                </el-option>
-              </el-select>
-            </div>
+
             <div v-if="hasFilters" class="filter-active-count">
               <span>{{ filterCount }} 项筛选</span>
               <el-button size="small" text type="danger" @click="clearFilters">清除</el-button>
@@ -92,12 +85,7 @@
                 <el-radio-button value="done">已完成</el-radio-button>
               </el-radio-group>
             </div>
-            <div class="mobile-filter-row">
-              <span class="filter-label">标签</span>
-              <div class="mobile-tags">
-                <el-tag v-for="t in allTags" :key="t" :type="filters.tag===t?'primary':''" size="small" class="mobile-tag" @click="toggleTag(t)">{{ t }}</el-tag>
-              </div>
-            </div>
+
             <div class="mobile-filter-clear">
               <el-button size="small" @click="clearFilters">清除筛选</el-button>
             </div>
@@ -175,11 +163,6 @@ const priorityLabel = computed(() =>
   filters.priority==='high'?'高':filters.priority==='medium'?'中':filters.priority==='low'?'低':'优先级'
 )
 
-const allTags = computed(() => {
-  const tags = new Set()
-  taskStore.tasks.forEach(t => t.tags?.forEach(tag => tags.add(tag)))
-  return [...tags]
-})
 
 window.addEventListener('resize', () => { isMobile.value = window.innerWidth <= 768 })
 
@@ -202,10 +185,6 @@ function clearFilters() {
   taskStore.loadTasks()
 }
 
-function toggleTag(tag) {
-  filters.tag = filters.tag === tag ? '' : tag
-  applyFilters()
-}
 
 async function handleAddTask() {
   const text = newTaskText.value.trim()
