@@ -27,13 +27,11 @@
         </div>
       </div>
 
-      <!-- Child tasks (indented) -->
+      <!-- Child tasks -->
       <template v-if="actualChildren(task).length && expanded.has(task.id)">
         <div v-for="childId in actualChildren(task)" :key="childId" class="child-wrapper">
           <div v-if="getChild(childId)" class="task-item child">
-            <div class="child-indent">
-              <span class="child-line"></span>
-            </div>
+            <div class="child-indent"><span class="child-line"></span></div>
             <el-checkbox :model-value="getChild(childId).completed" @change="(val) => toggleComplete(getChild(childId), val)" size="small" />
             <div class="task-info" @click="editTask(getChild(childId))">
               <div class="task-title" :class="{ completed: getChild(childId).completed }"><span v-if="getChild(childId).isRecurring" class="recur-icon">&#x1F501;</span>{{ getChild(childId).title }}</div>
@@ -75,7 +73,15 @@
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="editingTask.notes" type="textarea" :rows="3" placeholder="支持 Markdown" />
+          <div class="md-toolbar">
+            <el-button size="small" @click="insertMd('**','**','粗体')" title="粗体"><b>B</b></el-button>
+            <el-button size="small" @click="insertMd('~~','~~','删除线')" title="删除线"><s>S</s></el-button>
+            <el-button size="small" @click="insertMd('`','`','代码')" title="行内代码">&lt;/&gt;</el-button>
+            <el-button size="small" @click="insertList" title="列表">≡</el-button>
+            <el-color-picker size="small" @change="insertColor" :show-alpha="false" :predefine="predefineColors" />
+            <span class="md-hint">选中文字再点按钮</span>
+          </div>
+          <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown" />
         </el-form-item>
         <el-form-item label="重复">
           <el-switch v-model="editingIsRecurring" active-text="开启" />
@@ -126,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { VideoPlay, Delete, MagicStick, Loading, CaretRight, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useTaskStore } from '../../stores/tasks'
@@ -138,25 +144,30 @@ const editingTask = ref(null)
 const editingTaskRecurrence = ref({ interval: 1, frequency: 'daily' })
 const editingIsRecurring = ref(false)
 const expanded = ref(new Set())
+const notesRef = ref(null)
 
 const breakdownVisible = ref(false)
 const breakdownLoading = ref(false)
 const breakdownTask = ref(null)
 const breakdownSteps = ref([])
 
+const predefineColors = ['#f56c6c', '#e6a23c', '#67c23a', '#409eff', '#909399']
+
 const rootTasks = computed(() => taskStore.activeTasks.filter(t => !t.parentId))
 function getChild(id) { return taskStore.tasks.find(t => t.id === id) }
 function actualChildren(task) { if (task.childIds?.length) return task.childIds; return taskStore.tasks.filter(t => t.parentId===task.id && !t.deletedAt).map(t=>t.id) }
-function toggleExpand(id) {
-  if (expanded.value.has(id)) expanded.value.delete(id)
-  else expanded.value.add(id)
-  expanded.value = new Set(expanded.value)
-}
+function toggleExpand(id) { if (expanded.value.has(id)) expanded.value.delete(id); else expanded.value.add(id); expanded.value = new Set(expanded.value) }
 function completedChildren(task) { const ids = actualChildren(task); if (!ids.length) return 0; return ids.filter(id => taskStore.tasks.find(t => t.id === id)?.completed).length }
 
 function toggleComplete(task, val) { taskStore.editTask(task.id, { completed: val, status: val ? 'done' : 'todo' }) }
 function setStatus(task, status) { taskStore.editTask(task.id, { status }) }
-function editTask(task) { editingTask.value = { ...task }; editingIsRecurring.value = task.isRecurring || false; editingTaskRecurrence.value = task.recurrenceRule || { interval: 1, frequency: 'daily' }; dialogVisible.value = true }
+
+function editTask(task) {
+  editingTask.value = { ...task }
+  editingIsRecurring.value = task.isRecurring || false
+  editingTaskRecurrence.value = task.recurrenceRule || { interval: 1, frequency: 'daily' }
+  dialogVisible.value = true
+}
 
 async function saveEdit() {
   editingTask.value.isRecurring = editingIsRecurring.value
@@ -166,47 +177,56 @@ async function saveEdit() {
   ElMessage.success('已更新')
 }
 
-async function handleDelete(task) {
-  await taskStore.removeTask(task.id)
-  ElMessage.success('已移至回收站')
+async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessage.success('已移至回收站') }
+
+// ── Markdown toolbar helpers ──
+function getTextarea() { return notesRef.value?.$el?.querySelector('textarea') || notesRef.value?.textarea }
+
+function insertMd(before, after, placeholder) {
+  const el = getTextarea(); if (!el) return
+  const start = el.selectionStart; const end = el.selectionEnd
+  const selected = el.value.substring(start, end) || placeholder
+  const text = editingTask.value.notes || ''
+  editingTask.value.notes = text.substring(0, start) + before + selected + after + text.substring(end)
+  nextTick(() => { el.focus(); el.setSelectionRange(start + before.length, start + before.length + selected.length) })
+}
+
+function insertList() {
+  const el = getTextarea(); if (!el) return
+  const text = editingTask.value.notes || ''
+  const start = el.selectionStart
+  const lineStart = text.lastIndexOf('\n', start - 1) + 1
+  editingTask.value.notes = text.substring(0, lineStart) + '- ' + text.substring(lineStart)
+  nextTick(() => { el.focus(); el.setSelectionRange(lineStart + 2, lineStart + 2) })
+}
+
+function insertColor(color) {
+  const el = getTextarea(); if (!el) return
+  const start = el.selectionStart; const end = el.selectionEnd
+  const selected = el.value.substring(start, end) || '文字'
+  const text = editingTask.value.notes || ''
+  editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
+  nextTick(() => { el.focus() })
 }
 
 async function startBreakdown(task) {
-  breakdownTask.value = task
-  breakdownVisible.value = true
-  breakdownLoading.value = true
-  breakdownSteps.value = []
-  try {
-    const steps = await breakdownApi(task.title, task.notes)
-    breakdownSteps.value = steps.map(s => ({ title: s.title, priority: s.priority || 'medium' }))
-  } catch {
-    ElMessage.error('AI 拆解失败')
-    breakdownVisible.value = false
-  }
+  breakdownTask.value = task; breakdownVisible.value = true; breakdownLoading.value = true; breakdownSteps.value = []
+  try { const steps = await breakdownApi(task.title, task.notes); breakdownSteps.value = steps.map(s => ({ title: s.title, priority: s.priority || 'medium' })) }
+  catch { ElMessage.error('AI 拆解失败'); breakdownVisible.value = false }
   breakdownLoading.value = false
 }
 
 async function confirmBreakdown() {
-  const parent = breakdownTask.value
-  const steps = breakdownSteps.value.filter(s => s.title.trim())
+  const parent = breakdownTask.value; const steps = breakdownSteps.value.filter(s => s.title.trim())
   if (!steps.length || !parent) return
   const childIds = []
-  for (const step of steps) {
-    const child = await taskStore.addTask({ title: step.title.trim(), priority: step.priority, parentId: parent.id, projectId: parent.projectId, aiGenerated: true, aiParentId: parent.id })
-    childIds.push(child.id)
-  }
-  const allIds = [...new Set([...(parent.childIds||[]), ...childIds])]
-  await taskStore.editTask(parent.id, { childIds: allIds })
-  expanded.value.add(parent.id)
-  expanded.value = new Set(expanded.value)
-  breakdownVisible.value = false
-  ElMessage.success(`已生成 ${steps.length} 个子任务`)
+  for (const step of steps) { const child = await taskStore.addTask({ title: step.title.trim(), priority: step.priority, parentId: parent.id, projectId: parent.projectId, aiGenerated: true, aiParentId: parent.id }); childIds.push(child.id) }
+  const allIds = [...new Set([...(parent.childIds||[]), ...childIds])]; await taskStore.editTask(parent.id, { childIds: allIds })
+  expanded.value.add(parent.id); expanded.value = new Set(expanded.value); breakdownVisible.value = false
+  ElMessage.success('已生成 ' + steps.length + ' 个子任务')
 }
 
-function formatDate(date) {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-}
+function formatDate(date) { if (!date) return ''; return new Date(date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) }
 </script>
 
 <style scoped>
@@ -229,4 +249,9 @@ function formatDate(date) {
 .child-line { display:block; width:1.5px; height:100%; background:var(--el-border-color); position:relative; }
 .child-line::after { content:''; position:absolute; bottom:50%; left:0; width:12px; height:1.5px; background:var(--el-border-color); }
 .step-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+
+/* Markdown toolbar */
+.md-toolbar { display:flex; align-items:center; gap:4px; margin-bottom:6px; flex-wrap:wrap; }
+.md-toolbar .el-button { min-width:28px; height:28px; padding:0 6px; font-size:12px; }
+.md-hint { font-size:11px; color:var(--el-text-color-placeholder); margin-left:4px; }
 </style>
