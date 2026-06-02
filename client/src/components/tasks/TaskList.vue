@@ -6,6 +6,7 @@
         <el-checkbox :model-value="task.completed" @change="(val) => toggleComplete(task, val)" />
         <div class="task-info" @click="editTask(task)">
           <div class="task-title" :class="{ completed: task.completed }"><span v-if="task.isRecurring" class="recur-icon">&#x1F501;</span>{{ task.title }}</div>
+          <div class="task-notes-preview" v-if="task.notes">{{ truncateNotes(task.notes) }}</div>
           <div class="task-meta">
             <el-tag v-if="task.priority==='high'" type="danger" size="small">高</el-tag>
             <el-tag v-else-if="task.priority==='medium'" type="warning" size="small">中</el-tag>
@@ -35,6 +36,7 @@
             <el-checkbox :model-value="getChild(childId).completed" @change="(val) => toggleComplete(getChild(childId), val)" size="small" />
             <div class="task-info" @click="editTask(getChild(childId))">
               <div class="task-title" :class="{ completed: getChild(childId).completed }"><span v-if="getChild(childId).isRecurring" class="recur-icon">&#x1F501;</span>{{ getChild(childId).title }}</div>
+              <div class="task-notes-preview" v-if="getChild(childId).notes">{{ truncateNotes(getChild(childId).notes) }}</div>
               <div class="task-meta">
                 <el-tag v-if="getChild(childId).priority==='high'" type="danger" size="small">高</el-tag>
                 <el-tag v-else-if="getChild(childId).priority==='medium'" type="warning" size="small">中</el-tag>
@@ -74,12 +76,8 @@
         </el-form-item>
         <el-form-item label="备注">
           <div class="md-toolbar">
-            <el-button size="small" @click="insertMd('**','**','粗体')" title="粗体"><b>B</b></el-button>
-            <el-button size="small" @click="insertMd('~~','~~','删除线')" title="删除线"><s>S</s></el-button>
-            <el-button size="small" @click="insertMd('`','`','代码')" title="行内代码">&lt;/&gt;</el-button>
-            <el-button size="small" @click="insertList" title="列表">≡</el-button>
-            <el-color-picker size="small" @change="insertColor" :show-alpha="false" :predefine="predefineColors" />
-            <span class="md-hint">选中文字再点按钮</span>
+            <el-button size="small" @click="applyBold" title="加粗"><b>B</b></el-button>
+            <el-color-picker size="small" @change="applyColor" :show-alpha="false" :predefine="predefineColors" />
           </div>
           <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown" />
         </el-form-item>
@@ -179,33 +177,41 @@ async function saveEdit() {
 
 async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessage.success('已移至回收站') }
 
-// ── Markdown toolbar helpers ──
+function truncateNotes(notes) {
+  if (!notes) return ''
+  const plain = notes.replace(/<[^>]+>/g, '').replace(/[*_~`#]/g, '').trim()
+  return plain.length > 40 ? plain.substring(0, 40) + '...' : plain
+}
+
+// ── Markdown toolbar ──
 function getTextarea() { return notesRef.value?.$el?.querySelector('textarea') || notesRef.value?.textarea }
 
-function insertMd(before, after, placeholder) {
+function applyBold() {
   const el = getTextarea(); if (!el) return
-  const start = el.selectionStart; const end = el.selectionEnd
-  const selected = el.value.substring(start, end) || placeholder
   const text = editingTask.value.notes || ''
-  editingTask.value.notes = text.substring(0, start) + before + selected + after + text.substring(end)
-  nextTick(() => { el.focus(); el.setSelectionRange(start + before.length, start + before.length + selected.length) })
+  const start = el.selectionStart; const end = el.selectionEnd
+  const hasSelection = start !== end
+  if (hasSelection) {
+    const selected = text.substring(start, end)
+    editingTask.value.notes = text.substring(0, start) + '**' + selected + '**' + text.substring(end)
+    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 2 + selected.length) })
+  } else {
+    editingTask.value.notes = text.substring(0, start) + '**粗体**' + text.substring(start)
+    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 4) })
+  }
 }
 
-function insertList() {
+function applyColor(color) {
   const el = getTextarea(); if (!el) return
   const text = editingTask.value.notes || ''
-  const start = el.selectionStart
-  const lineStart = text.lastIndexOf('\n', start - 1) + 1
-  editingTask.value.notes = text.substring(0, lineStart) + '- ' + text.substring(lineStart)
-  nextTick(() => { el.focus(); el.setSelectionRange(lineStart + 2, lineStart + 2) })
-}
-
-function insertColor(color) {
-  const el = getTextarea(); if (!el) return
   const start = el.selectionStart; const end = el.selectionEnd
-  const selected = el.value.substring(start, end) || '文字'
-  const text = editingTask.value.notes || ''
-  editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
+  const hasSelection = start !== end
+  if (hasSelection) {
+    const selected = text.substring(start, end)
+    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
+  } else {
+    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">文字</span>' + text.substring(start)
+  }
   nextTick(() => { el.focus() })
 }
 
@@ -235,9 +241,10 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .task-item.child { padding:8px 0 8px 0; }
 .task-info { flex:1; cursor:pointer; min-width:0; }
 .recur-icon { margin-right:4px; font-size:13px; }
-.task-title { font-size:15px; margin-bottom:4px; }
+.task-title { font-size:15px; margin-bottom:2px; }
 .task-item.child .task-title { font-size:14px; color:var(--el-text-color-regular); }
 .task-title.completed { text-decoration:line-through; color:var(--el-text-color-placeholder); }
+.task-notes-preview { font-size:12px; color:var(--el-text-color-placeholder); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px; }
 .task-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .due-date { font-size:12px; color:var(--el-text-color-secondary); }
 .child-badge { font-size:12px; color:var(--el-color-primary); cursor:pointer; display:inline-flex; align-items:center; }
@@ -250,8 +257,6 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .child-line::after { content:''; position:absolute; bottom:50%; left:0; width:12px; height:1.5px; background:var(--el-border-color); }
 .step-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
 
-/* Markdown toolbar */
-.md-toolbar { display:flex; align-items:center; gap:4px; margin-bottom:6px; flex-wrap:wrap; }
+.md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
 .md-toolbar .el-button { min-width:28px; height:28px; padding:0 6px; font-size:12px; }
-.md-hint { font-size:11px; color:var(--el-text-color-placeholder); margin-left:4px; }
 </style>

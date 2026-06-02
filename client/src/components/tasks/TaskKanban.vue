@@ -17,7 +17,7 @@
           </el-tag>
           <span v-if="task.dueDate" class="card-date">{{ formatDate(task.dueDate) }}</span>
         </div>
-        <div v-if="task.notes" class="card-notes" v-html="renderNotes(task.notes)"></div>
+        <div v-if="task.notes" class="card-notes">{{ truncateNotes(task.notes) }}</div>
         <div v-if="childMap[task.id]?.length" class="card-children">
           <div class="children-toggle" @click.stop="toggleExpand(task.id)">
             <el-icon style="margin-right:2px"><component :is="expanded.has(task.id)?CaretBottom:CaretRight" /></el-icon>
@@ -56,12 +56,8 @@
         </el-form-item>
         <el-form-item label="备注">
           <div class="md-toolbar">
-            <el-button size="small" @click="insertMd('**','**','粗体')" title="粗体"><b>B</b></el-button>
-            <el-button size="small" @click="insertMd('~~','~~','删除线')" title="删除线"><s>S</s></el-button>
-            <el-button size="small" @click="insertMd('`','`','代码')" title="行内代码">&lt;/&gt;</el-button>
-            <el-button size="small" @click="insertList" title="列表">≡</el-button>
-            <el-color-picker size="small" @change="insertColor" :show-alpha="false" :predefine="predefineColors" />
-            <span class="md-hint">选中文字再点按钮</span>
+            <el-button size="small" @click="applyBold" title="加粗"><b>B</b></el-button>
+            <el-color-picker size="small" @change="applyColor" :show-alpha="false" :predefine="predefineColors" />
           </div>
           <el-input ref="notesRef" v-model="editingTask.notes" type="textarea" :rows="4" placeholder="支持 Markdown" />
         </el-form-item>
@@ -92,7 +88,6 @@
 import { ref, computed, nextTick } from 'vue'
 import { Delete, CaretRight, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { marked } from 'marked'
 import { useTaskStore } from '../../stores/tasks'
 
 const taskStore = useTaskStore()
@@ -139,38 +134,39 @@ async function saveEdit() {
 
 async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessage.success('已移至回收站') }
 
-function renderNotes(notes) {
+function truncateNotes(notes) {
   if (!notes) return ''
-  return marked.parse(notes.length > 60 ? notes.substring(0, 60) + '...' : notes)
+  const plain = notes.replace(/<[^>]+>/g, '').replace(/[*_~`#]/g, '').trim()
+  return plain.length > 30 ? plain.substring(0, 30) + '...' : plain
 }
 
 // ── Markdown toolbar ──
 function getTextarea() { return notesRef.value?.$el?.querySelector('textarea') || notesRef.value?.textarea }
 
-function insertMd(before, after, placeholder) {
+function applyBold() {
   const el = getTextarea(); if (!el) return
-  const start = el.selectionStart; const end = el.selectionEnd
-  const selected = el.value.substring(start, end) || placeholder
   const text = editingTask.value.notes || ''
-  editingTask.value.notes = text.substring(0, start) + before + selected + after + text.substring(end)
-  nextTick(() => { el.focus(); el.setSelectionRange(start + before.length, start + before.length + selected.length) })
+  const start = el.selectionStart; const end = el.selectionEnd
+  if (start !== end) {
+    const selected = text.substring(start, end)
+    editingTask.value.notes = text.substring(0, start) + '**' + selected + '**' + text.substring(end)
+    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 2 + selected.length) })
+  } else {
+    editingTask.value.notes = text.substring(0, start) + '**粗体**' + text.substring(start)
+    nextTick(() => { el.focus(); el.setSelectionRange(start + 2, start + 4) })
+  }
 }
 
-function insertList() {
+function applyColor(color) {
   const el = getTextarea(); if (!el) return
   const text = editingTask.value.notes || ''
-  const start = el.selectionStart
-  const lineStart = text.lastIndexOf('\n', start - 1) + 1
-  editingTask.value.notes = text.substring(0, lineStart) + '- ' + text.substring(lineStart)
-  nextTick(() => { el.focus(); el.setSelectionRange(lineStart + 2, lineStart + 2) })
-}
-
-function insertColor(color) {
-  const el = getTextarea(); if (!el) return
   const start = el.selectionStart; const end = el.selectionEnd
-  const selected = el.value.substring(start, end) || '文字'
-  const text = editingTask.value.notes || ''
-  editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
+  if (start !== end) {
+    const selected = text.substring(start, end)
+    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">' + selected + '</span>' + text.substring(end)
+  } else {
+    editingTask.value.notes = text.substring(0, start) + '<span style="color:' + color + '">文字</span>' + text.substring(start)
+  }
   nextTick(() => { el.focus() })
 }
 
@@ -196,8 +192,7 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .kanban-card:hover .card-delete { opacity:1; }
 .card-meta { display:flex; align-items:center; gap:6px; margin-top:6px; }
 .card-date { font-size:12px; color:var(--el-text-color-secondary); }
-.card-notes { font-size:12px; color:var(--el-text-color-secondary); margin-top:6px; line-height:1.4; max-height:40px; overflow:hidden; }
-.card-notes :deep(p) { margin:0; }
+.card-notes { font-size:12px; color:var(--el-text-color-placeholder); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .card-children { margin-top:8px; border-top:1px solid var(--el-border-color-lighter); padding-top:6px; }
 .children-toggle { font-size:12px; color:var(--el-color-primary); cursor:pointer; display:flex; align-items:center; }
 .children-toggle:hover { text-decoration:underline; }
@@ -206,9 +201,8 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .child-title { flex:1; }
 .child-title.done { text-decoration:line-through; color:var(--el-text-color-placeholder); }
 
-.md-toolbar { display:flex; align-items:center; gap:4px; margin-bottom:6px; flex-wrap:wrap; }
+.md-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
 .md-toolbar .el-button { min-width:28px; height:28px; padding:0 6px; font-size:12px; }
-.md-hint { font-size:11px; color:var(--el-text-color-placeholder); margin-left:4px; }
 
 @media (max-width:768px) {
   .kanban { flex-direction:column; gap:12px; height:auto; overflow-y:auto; }
