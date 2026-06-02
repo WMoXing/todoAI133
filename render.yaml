@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ai-todo
+    env: node
+    rootDir: server
+    buildCommand: npm install && cd ../client && npm install && npm run build
+    startCommand: node src/index.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
+      - key: BITIFUL_ACCESS_KEY
+        sync: false
+      - key: BITIFUL_SECRET_KEY
+        sync: false
+      - key: BITIFUL_BUCKET
+        sync: false
+      - key: BITIFUL_ENDPOINT
+        value: https://s3.bitiful.net

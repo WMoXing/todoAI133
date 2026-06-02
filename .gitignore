@@ -1,0 +1,14 @@
+﻿node_modules/
+dist/
+.env
+data.json
+
+.agents/
+skills-lock.json
+*.log
+dist/
+
+.agents/
+skills-lock.json
+*.log
+dist/
