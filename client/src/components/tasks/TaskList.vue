@@ -206,9 +206,7 @@ function onNotesInput() {
 function applyColor(color) {
   if (!notesRef.value) return
   notesRef.value.focus()
-  document.execCommand('selectAll')
   document.execCommand('foreColor', false, color)
-  notesRef.value.focus()
 }
 
 function clearColor() {
@@ -216,8 +214,6 @@ function clearColor() {
   notesRef.value.focus()
   document.execCommand('selectAll')
   document.execCommand('removeFormat')
-  document.execCommand('foreColor', false, '')
-  notesRef.value.focus()
 }
 
 async function startBreakdown(task) {
