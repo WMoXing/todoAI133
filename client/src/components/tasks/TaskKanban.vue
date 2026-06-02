@@ -161,7 +161,19 @@ function onNotesInput() {
 function applyColor(color) {
   if (!notesRef.value) return
   notesRef.value.focus()
-  document.execCommand('foreColor', false, color)
+  const sel = window.getSelection()
+  const hasSelection = sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+  if (hasSelection) {
+    document.execCommand("foreColor", false, color)
+  } else {
+    const text = notesRef.value.textContent
+    if (!text.trim()) {
+      document.execCommand("foreColor", false, color)
+      return
+    }
+    const html = notesRef.value.innerHTML.replace(/<span style="color:[^"]+">/g, "").replace(/<\/span>/g, "")
+    notesRef.value.innerHTML = "<span style=\u0022color:" + color + "\u0022>" + html + "</span>"
+  }
 }
 
 function clearColor() {
