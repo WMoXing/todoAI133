@@ -28,17 +28,9 @@
       </div>
     </div>
 
-    <!-- Quick actions -->
     <div class="quick-actions" v-if="currentSession && currentSession.messages?.length <= 2">
       <span class="quick-label">快捷提问：</span>
-      <el-button
-        v-for="qa in quickActions"
-        :key="qa.label"
-        size="small"
-        round
-        @click="quickSend(qa.text)"
-        :disabled="streaming"
-      >{{ qa.label }}</el-button>
+      <el-button v-for="qa in quickActions" :key="qa.label" size="small" round @click="quickSend(qa.text)" :disabled="streaming">{{ qa.label }}</el-button>
     </div>
 
     <div class="chat-input">
@@ -114,7 +106,8 @@ function extractTaskBlocks(text) {
   let i = 0
   while ((i = text.indexOf('[TASK:', i)) !== -1) {
     const start = i + 6
-    let depth = 0; let j = start
+    let depth = 0
+    let j = start
     for (; j < text.length; j++) {
       if (text[j] === '{' || text[j] === '[') depth++
       else if (text[j] === '}' || text[j] === ']') depth--
@@ -129,16 +122,12 @@ function extractTaskBlocks(text) {
 }
 
 async function parseAndCreateTasks(text, userMsg) {
-  console.log('[parseAndCreateTasks] raw text:', text.substring(0, 300))
   const blocks = extractTaskBlocks(text)
-  console.log('[parseAndCreateTasks] blocks found:', blocks.length)
   for (const block of blocks) {
     try {
       const json = block.startsWith('{') ? block : block.substring(block.indexOf('{'))
       if (!json.startsWith('{')) continue
-      console.log('[parseAndCreateTasks] parsing:', json.substring(0, 100))
       const taskData = enrichRecurring(JSON.parse(json), userMsg)
-      const taskData = enrichRecurring(JSON.parse(match[1]), userMsg)
       await taskStore.addTask({
         title: taskData.title || '新任务',
         priority: taskData.priority || 'medium',
@@ -150,12 +139,14 @@ async function parseAndCreateTasks(text, userMsg) {
       })
       ElMessage.success('AI 已添加: ' + (taskData.title || '新任务'))
     } catch (e) {
-      console.error('[parseAndCreateTasks] failed:', e.message, 'json:', block.substring(0, 100))
+      // skip invalid JSON
     }
   }
-  const cleaned = text.replace(/\[TASK:.*?\]/g, '').trim()
-  if (blocks.length === 0) console.log('[parseAndCreateTasks] no [TASK:] blocks found in response')
-  return cleaned
+  let cleaned = text
+  for (const block of blocks) {
+    cleaned = cleaned.replace('[TASK:' + block + ']', '')
+  }
+  return cleaned.trim()
 }
 
 function quickSend(text) {
