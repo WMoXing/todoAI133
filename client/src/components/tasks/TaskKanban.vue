@@ -33,7 +33,6 @@
       </div>
     </div>
 
-    <!-- Edit dialog -->
     <el-dialog v-model="dialogVisible" title="编辑任务" width="500px">
       <el-form v-if="editingTask" label-position="top">
         <el-form-item label="标题"><el-input v-model="editingTask.title" /></el-form-item>
@@ -60,7 +59,7 @@
               <span v-for="c in colorOptions" :key="c.color" class="color-btn" :style="{ background: c.color }" @click="applyColor(c.color)" :title="c.label"></span>
               <el-button size="small" text @click="clearColor" type="danger">清除颜色</el-button>
             </div>
-            <div ref="notesRef" class="notes-editor" contenteditable="true" @input="onNotesInput" placeholder="写点备注..."></div>
+            <div ref="notesRef" class="notes-editor" contenteditable="true" @input="onNotesInput(editingTask)" placeholder="写点备注..."></div>
           </div>
         </el-form-item>
         <el-form-item label="重复">
@@ -91,25 +90,16 @@ import { ref, computed, nextTick } from 'vue'
 import { Delete, CaretRight, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useTaskStore } from '../../stores/tasks'
+import { colorOptions, useNotesEditor } from '../../composables/useNotesEditor'
 
 const taskStore = useTaskStore()
+const { notesRef, onNotesInput, loadNotes, applyColor, clearColor, previewNotes } = useNotesEditor()
+
 const expanded = ref(new Set())
 const dialogVisible = ref(false)
 const editingTask = ref(null)
 const editingTaskRecurrence = ref({ interval: 1, frequency: 'daily' })
 const editingIsRecurring = ref(false)
-const notesRef = ref(null)
-
-const colorOptions = [
-  { color: '#f56c6c', label: '红' },
-  { color: '#e6a23c', label: '橙' },
-  { color: '#67c23a', label: '绿' },
-  { color: '#409eff', label: '蓝' },
-  { color: '#909399', label: '灰' },
-  { color: '#e040fb', label: '紫' },
-  { color: '#ff6f00', label: '深橙' },
-  { color: '#00bfa5', label: '青' },
-]
 
 const columns = [
   { key: 'todo', label: '待办' },
@@ -133,9 +123,7 @@ function editTask(task) {
   editingIsRecurring.value = task.isRecurring || false
   editingTaskRecurrence.value = task.recurrenceRule || { interval: 1, frequency: 'daily' }
   dialogVisible.value = true
-  nextTick(() => {
-    if (notesRef.value) notesRef.value.innerHTML = task.notes || ''
-  })
+  nextTick(() => loadNotes(task.notes || ''))
 }
 
 async function saveEdit() {
@@ -148,40 +136,6 @@ async function saveEdit() {
 }
 
 async function handleDelete(task) { await taskStore.removeTask(task.id); ElMessage.success('已移至回收站') }
-
-function previewNotes(notes) {
-  if (!notes) return ''
-  return '<span style="font-size:12px;color:var(--el-text-color-placeholder);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">' + notes + '</span>'
-}
-
-function onNotesInput() {
-  if (notesRef.value) editingTask.value.notes = notesRef.value.innerHTML
-}
-
-function applyColor(color) {
-  if (!notesRef.value) return
-  notesRef.value.focus()
-  const sel = window.getSelection()
-  const hasSelection = sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
-  if (hasSelection) {
-    document.execCommand("foreColor", false, color)
-  } else {
-    const text = notesRef.value.textContent
-    if (!text.trim()) {
-      document.execCommand("foreColor", false, color)
-      return
-    }
-    const html = notesRef.value.innerHTML.replace(/<span style="color:[^"]+">/g, "").replace(/<\/span>/g, "")
-    notesRef.value.innerHTML = "<span style=\u0022color:" + color + "\u0022>" + html + "</span>"
-  }
-}
-
-function clearColor() {
-  if (!notesRef.value) return
-  const html = notesRef.value.innerHTML.replace(/<span style="color:[^"]+">/g, "").replace(/<\/span>/g, "")
-  notesRef.value.innerHTML = html
-  notesRef.value.focus()
-}
 
 let draggedTask = null
 function handleDragStart(e, task) { draggedTask = task; e.dataTransfer.effectAllowed = 'move' }
@@ -219,6 +173,7 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .color-btn { width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all 0.15s; display:inline-block; }
 .color-btn:hover { border-color:var(--el-text-color-primary); transform:scale(1.15); }
 
+.notes-wrap { display:flex; flex-direction:column; gap:0; }
 .notes-editor {
   flex:1; min-height:80px; max-height:180px; overflow-y:auto;
   border:1px solid var(--el-border-color); border-radius:4px;
@@ -227,7 +182,6 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
   color:var(--el-text-color-primary);
 }
 .notes-editor:focus { border-color:var(--el-color-primary); }
-.notes-wrap { display:flex; flex-direction:column; gap:0; }
 .notes-editor:empty::before {
   content:attr(placeholder); color:var(--el-text-color-placeholder);
 }

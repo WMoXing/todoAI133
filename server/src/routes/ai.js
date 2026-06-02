@@ -194,22 +194,4 @@ ${taskContext}
   }
 });
 
-// Helper: detect and fix missing recurrence from user message
-function enrichTaskFromUserMsg(taskData, userMessage) {
-  const lower = (userMessage || '').toLowerCase();
-  if (taskData.isRecurring) return taskData; // already set
-
-  if (lower.includes('每天') || lower.includes('每日') || lower.includes('天天') || lower.includes('every day') || lower.includes('daily')) {
-    taskData.isRecurring = true;
-    taskData.recurrenceRule = { frequency: 'daily', interval: 1 };
-  } else if (lower.includes('每周') || lower.includes('weekly') || lower.includes('every week')) {
-    taskData.isRecurring = true;
-    taskData.recurrenceRule = { frequency: 'weekly', interval: 1 };
-  } else if (lower.includes('每月') || lower.includes('每个月') || lower.includes('monthly') || lower.includes('every month')) {
-    taskData.isRecurring = true;
-    taskData.recurrenceRule = { frequency: 'monthly', interval: 1 };
-  }
-  return taskData;
-}
-
 module.exports = router;

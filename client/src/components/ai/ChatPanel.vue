@@ -56,7 +56,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { Plus, Promotion } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
-import { createChatSession, fetchChatSessions, fetchChatSession, sendChatMessage, createTask } from '../../api'
+import { createChatSession, fetchChatSessions, fetchChatSession, sendChatMessage } from '../../api'
 import { useTaskStore } from '../../stores/tasks'
 
 const props = defineProps({ fullScreen: { type: Boolean, default: false } })

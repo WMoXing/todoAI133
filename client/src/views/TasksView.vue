@@ -145,16 +145,14 @@ const filters = reactive({
   search: '',
   priority: '',
   status: '',
-  tag: '',
 })
 
-const hasFilters = computed(() => filters.search || filters.priority || filters.status || filters.tag)
+const hasFilters = computed(() => filters.search || filters.priority || filters.status)
 const filterCount = computed(() => {
   let n = 0
   if (filters.search) n++
   if (filters.priority) n++
   if (filters.status) n++
-  if (filters.tag) n++
   return n
 })
 
@@ -174,7 +172,6 @@ function applyFilters() {
     if (filters.search) params.search = filters.search
     if (filters.priority) params.priority = filters.priority
     if (filters.status) params.status = filters.status
-    if (filters.tag) params.tag = filters.tag
     taskStore.loadTasks(params)
   }, 300)
 }
