@@ -106,15 +106,15 @@ function extractTaskBlocks(text) {
   let i = 0
   while ((i = text.indexOf('[TASK:', i)) !== -1) {
     const start = i + 6
-    let depth = 0
+    let depth = 1
     let j = start
     for (; j < text.length; j++) {
       if (text[j] === '{' || text[j] === '[') depth++
       else if (text[j] === '}' || text[j] === ']') depth--
       if (depth === 0) break
     }
-    if (depth === 0 && text[j] === ']') {
-      results.push(text.substring(start, j + 1))
+    if (depth === 0) {
+      results.push(text.substring(start, j))
     }
     i = j + 1
   }
