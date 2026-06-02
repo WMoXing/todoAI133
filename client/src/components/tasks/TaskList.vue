@@ -223,9 +223,9 @@ function applyColor(color) {
 
 function clearColor() {
   if (!notesRef.value) return
+  const html = notesRef.value.innerHTML.replace(/<span style="color:[^"]+">/g, "").replace(/<\/span>/g, "")
+  notesRef.value.innerHTML = html
   notesRef.value.focus()
-  document.execCommand('selectAll')
-  document.execCommand('removeFormat')
 }
 
 async function startBreakdown(task) {
