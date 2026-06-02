@@ -210,7 +210,7 @@ function formatDate(date) { if (!date) return ''; return new Date(date).toLocale
 .color-btn:hover { border-color:var(--el-text-color-primary); transform:scale(1.15); }
 
 .notes-editor {
-  min-height:80px; max-height:200px; overflow-y:auto;
+  height:100px; overflow-y:auto; resize:vertical;
   border:1px solid var(--el-border-color); border-radius:4px;
   padding:8px 12px; font-size:14px; line-height:1.6; outline:none;
   background:var(--el-input-bg-color, var(--el-bg-color));
